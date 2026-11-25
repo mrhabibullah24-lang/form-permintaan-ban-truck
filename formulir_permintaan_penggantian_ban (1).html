@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Formulir Permintaan Penggantian Ban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script>
+    // Konfigurasi tema Tailwind menggunakan font sistem bawaan perangkat
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          },
+          colors: {
+            navy: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#090d16',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Pengaturan dasar tampilan sentuh dan animasi */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      background-color: #f1f5f9;
+    }
+    .tyre-btn {
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .tyre-btn:active {
+      transform: scale(0.95);
+    }
+    .signature-pad {
+      touch-action: none;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.25s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="font-sans text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Container Notifikasi Toast -->
+  <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md pointer-events-none flex flex-col gap-2"></div>
+
+  <!-- Modal Sukses PDF & Kirim WhatsApp -->
+  <div id="pdf-share-modal" class="fixed inset-0 z-50 bg-slate-950/85 hidden items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 animate-slide-up">
+      <div class="bg-navy-900 px-5 py-4 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-extrabold shadow">
+            ✓
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold leading-tight">PDF Form Siap Dikirim!</h3>
+            <p id="pdf-modal-form-no" class="text-xs text-amber-400 font-bold">-</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePdfShareModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Nomor Polisi (Plat):</span>
+            <span id="pdf-modal-nopol" class="font-extrabold text-navy-900">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Pengemudi:</span>
+            <span id="pdf-modal-driver" class="font-bold text-slate-800">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Posisi Ban:</span>
+            <span id="pdf-modal-tyres" class="font-bold text-amber-700 text-right">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Nama File PDF:</span>
+            <span id="pdf-modal-filename" class="font-mono font-bold text-emerald-700 truncate max-w-[190px]">-</span>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+          File PDF resmi (lengkap dengan tabel, foto kondisi ban, foto odometer &amp; tanda tangan sopir) otomatis terunduh ke HP Anda. Ketuk tombol di bawah untuk langsung mengirim via WhatsApp:
+        </p>
+
+        <div class="space-y-2.5">
+          <button
+            type="button"
+            id="btn-share-wa-direct"
+            onclick="shareCurrentPdfToWhatsApp()"
+            class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2.5 transition"
+          >
+            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+              <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2.546 20.2c-.151.512.333.996.845.845l3.032-.892A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+            </svg>
+            <span>KIRIM PDF VIA WHATSAPP</span>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onclick="redownloadCurrentPdf()"
+              class="py-2.5 px-3 rounded-xl bg-navy-900 hover:bg-navy-800 text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5"
+            >
+              <span>📄 Unduh Ulang PDF</span>
+            </button>
+            <button
+              type="button"
+              onclick="closePdfShareModal()"
+              class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5"
+            >
+              <span>✓ Selesai</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Preview Foto Fullscreen -->
+  <div id="photo-modal" class="fixed inset-0 z-50 bg-slate-950/90 hidden items-center justify-center p-4 backdrop-blur-sm" onclick="closePhotoModal()">
+    <div class="relative max-w-lg w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700">
+        <span id="photo-modal-title" class="text-sm font-semibold text-white truncate pr-4">Preview Foto</span>
+        <button type="button" onclick="closePhotoModal()" class="p-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold">
+          TUTUP ✕
+        </button>
+      </div>
+      <div class="p-3 flex items-center justify-center bg-black/50 max-h-[75vh] overflow-auto">
+        <img id="photo-modal-img" src="" alt="Preview Foto" class="max-w-full max-h-[68vh] rounded-xl object-contain" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Konfirmasi -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-950/75 hidden items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 animate-slide-up">
+      <div class="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+        </svg>
+      </div>
+      <h3 id="confirm-modal-title" class="text-lg font-bold text-slate-900">Konfirmasi</h3>
+      <p id="confirm-modal-desc" class="text-sm text-slate-600 mt-1 mb-5">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" onclick="closeConfirmModal()" class="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm">
+          Batal
+        </button>
+        <button type="button" id="confirm-modal-btn" class="py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md">
+          Ya, Lanjutkan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Konten Utama -->
+  <main class="flex-1 w-full max-w-2xl mx-auto px-4 pt-5 pb-24">
+
+    <!-- Judul Utama Formulir & Petunjuk Pengisian -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 mb-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="w-full">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="inline-block text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
+              Operasional &amp; Maintenance Armada
+            </span>
+            <span id="header-date" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200 hidden sm:inline-block"></span>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-extrabold text-navy-900 tracking-tight leading-snug">
+            Formulir Permintaan Penggantian Ban
+          </h1>
+
+          <!-- Kartu Petunjuk Pengisian -->
+          <div class="mt-3 rounded-xl bg-gradient-to-br from-slate-50 via-amber-50/50 to-slate-100/80 border border-amber-200/90 p-3">
+            <div class="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-navy-900 mb-2">
+              <span class="w-4 h-4 rounded-full bg-amber-400 text-navy-950 flex items-center justify-center text-[10px]">i</span>
+              <span>Alur &amp; Petunjuk Pengisian</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <span class="inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                <span class="text-amber-600 font-extrabold">1</span> Isi data truk
+              </span>
+              <span class="text-amber-500 font-extrabold">→</span>
+              <span class="inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                <span class="text-amber-600 font-extrabold">2</span> Pilih posisi ban pada diagram
+              </span>
+              <span class="text-amber-500 font-extrabold">→</span>
+              <span class="inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                <span class="text-amber-600 font-extrabold">3</span> Lampirkan foto &amp; tanda tangan
+              </span>
+              <span class="text-amber-500 font-extrabold">→</span>
+              <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-200">
+                <span class="text-emerald-700 font-extrabold">4</span> Buat PDF untuk dikirim via WhatsApp
+              </span>
+            </div>
+            <p class="mt-2 pt-2 border-t border-amber-200/70 text-[11px] sm:text-xs text-slate-700 leading-relaxed flex items-start gap-1.5">
+              <span class="text-emerald-600 font-extrabold shrink-0">📲</span>
+              <span>
+                Kirim file PDF ke mekanik <strong class="text-navy-900 font-extrabold">Pak Rony</strong> untuk dilakukan <strong class="text-navy-900 font-bold">pengecheckan secara langsung</strong>.
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="sm:hidden mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+        <span class="font-medium">Tanggal Hari Ini:</span>
+        <span id="header-date-mobile" class="font-bold text-navy-900"></span>
+      </div>
+    </div>
+
+    <!-- FORM SOPIR -->
+    <section id="view-driver" class="space-y-4 animate-slide-up">
+
+      <!-- Banner Info Identitas Form (Nama & Tanggal) -->
+      <div class="bg-navy-900 text-white rounded-2xl p-4 shadow-md border border-slate-800 flex items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Identitas Form (Nama &amp; Tanggal)</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-emerald-400 font-bold border border-slate-700">Otomatis</span>
+          </div>
+          <span id="preview-form-number" class="text-base sm:text-lg font-extrabold text-amber-400 tracking-wide mt-0.5 block">NAMA SOPIR / 25-11-2026</span>
+        </div>
+        <button type="button" onclick="resetDriverForm()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 shrink-0">
+          Reset Form
+        </button>
+      </div>
+
+      <form id="tyre-request-form" onsubmit="handleFormSubmit(event)" class="space-y-4" novalidate>
+
+        <!-- BAGIAN 1: IDENTITAS ARMADA & PENGEMUDI -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+            <span class="w-7 h-7 rounded-lg bg-navy-900 text-amber-400 font-extrabold text-sm flex items-center justify-center">1</span>
+            <div>
+              <h2 class="font-bold text-slate-900 text-base">Identitas Armada &amp; Pengemudi</h2>
+              <p class="text-xs text-slate-500">Lengkapi data truk dan angka kilometer saat ini</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label for="input-nopol" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Nomor Polisi (Plat) <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="input-nopol"
+                placeholder="Contoh: H 8912 UV"
+                required
+                class="w-full px-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-navy-900 focus:outline-none text-base font-bold uppercase bg-slate-50 focus:bg-white transition"
+              />
+            </div>
+
+            <div>
+              <label for="input-driver" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Nama Pengemudi <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="input-driver"
+                placeholder="Nama lengkap sopir"
+                required
+                oninput="updateNextFormNumberPreview()"
+                class="w-full px-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-navy-900 focus:outline-none text-base font-medium bg-slate-50 focus:bg-white transition"
+              />
+            </div>
+          </div>
+
+          <!-- Pilihan Jenis Truk -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Jenis Truk / Konfigurasi Roda <span class="text-red-500">*</span>
+            </label>
+            <div class="grid grid-cols-2 gap-2.5" id="truck-type-selector">
+              <button type="button" data-type="tronton" onclick="selectTruckType('tronton')"
+                class="truck-type-btn p-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-left transition flex flex-col justify-between">
+                <span class="text-xs font-extrabold text-navy-900">Tronton (10 Roda)</span>
+                <span class="text-[11px] text-slate-600 mt-0.5">6x2 / 6x4 + 1 Serep</span>
+              </button>
+
+              <button type="button" data-type="engkel" onclick="selectTruckType('engkel')"
+                class="truck-type-btn p-3 rounded-xl border-2 border-slate-200 bg-white text-left transition flex flex-col justify-between">
+                <span class="text-xs font-extrabold text-slate-800">Engkel (6 Roda)</span>
+                <span class="text-[11px] text-slate-500 mt-0.5">Depan 2 + Belakang Ganda 4 + 1 Serep</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label for="input-odometer" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Odometer / KM Saat Ini <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  type="number"
+                  id="input-odometer"
+                  inputmode="numeric"
+                  placeholder="Contoh: 185420"
+                  required
+                  oninput="recalculateAllKm()"
+                  class="w-full pl-3.5 pr-12 py-3 rounded-xl border-2 border-slate-200 focus:border-navy-900 focus:outline-none text-base font-extrabold text-navy-900 bg-slate-50 focus:bg-white transition"
+                />
+                <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">KM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAGIAN 2: DIAGRAM INTERAKTIF POSISI BAN -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+          <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-navy-900 text-amber-400 font-extrabold text-sm flex items-center justify-center">2</span>
+              <div>
+                <h2 class="font-bold text-slate-900 text-base">Pilih Posisi Ban Rusak</h2>
+                <p class="text-xs text-slate-500">Tap langsung gambar ban pada diagram (bisa pilih lebih dari 1)</p>
+              </div>
+            </div>
+            <span id="selected-count-pill" class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+              0 Ban Dipilih
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-[11px] font-semibold">
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1.5 text-slate-700">
+                <span class="w-3.5 h-3.5 rounded bg-slate-800 border border-slate-600 inline-block"></span> Normal
+              </span>
+              <span class="flex items-center gap-1.5 text-amber-800">
+                <span class="w-3.5 h-3.5 rounded bg-amber-400 border-2 border-navy-900 inline-block"></span> Dipilih Ganti
+              </span>
+            </div>
+            <span class="text-slate-500">Tampak Atas (Atas = Depan)</span>
+          </div>
+
+          <div class="w-full bg-slate-100/80 rounded-2xl border-2 border-dashed border-slate-300 p-2 sm:p-3 flex flex-col items-center justify-center overflow-hidden">
+            <div id="truck-diagram-container" class="w-full max-w-[360px]"></div>
+          </div>
+
+          <div id="selected-tyres-pills" class="flex flex-wrap gap-1.5 pt-1">
+            <span class="text-xs text-slate-400 italic">Belum ada posisi ban yang dipilih. Silakan tap gambar ban di atas.</span>
+          </div>
+        </div>
+
+        <!-- DETAIL SETIAP BAN TERPILIH -->
+        <div id="selected-tyres-details-wrapper" class="space-y-3"></div>
+
+        <!-- BAGIAN 3: FOTO ODOMETER DASHBOARD -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+            <span class="w-7 h-7 rounded-lg bg-navy-900 text-amber-400 font-extrabold text-sm flex items-center justify-center">3</span>
+            <div>
+              <h2 class="font-bold text-slate-900 text-base">Foto Odometer Dashboard</h2>
+              <p class="text-xs text-slate-500">Bukti angka KM di dashboard truk saat ini</p>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Foto Odometer Dashboard Truk <span class="text-red-500">*</span>
+            </label>
+
+            <div id="odometer-upload-box" class="border-2 border-dashed border-slate-300 rounded-2xl p-4 bg-slate-50 text-center transition hover:border-navy-900">
+              <input
+                type="file"
+                id="input-odometer-photo"
+                accept="image/*"
+                class="hidden"
+                onchange="handleOdometerPhotoChange(event)"
+              />
+              <div id="odometer-photo-placeholder" class="space-y-2">
+                <div class="w-12 h-12 rounded-2xl bg-navy-900 text-amber-400 flex items-center justify-center mx-auto shadow">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <p class="text-xs font-semibold text-slate-700">Ambil foto layar speedometer / odometer</p>
+                <button
+                  type="button"
+                  onclick="document.getElementById('input-odometer-photo').click()"
+                  class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold shadow"
+                >
+                  <span>📷 Buka Kamera / Pilih Foto</span>
+                </button>
+              </div>
+              <div id="odometer-photo-preview-wrap" class="hidden space-y-2.5">
+                <img
+                  id="odometer-photo-preview"
+                  src=""
+                  alt="Preview Odometer"
+                  onclick="openPhotoModal(this.src, 'Foto Odometer Dashboard')"
+                  class="max-h-44 mx-auto rounded-xl border border-slate-300 object-contain cursor-pointer"
+                />
+                <div class="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onclick="document.getElementById('input-odometer-photo').click()"
+                    class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-xs font-bold text-slate-800"
+                  >
+                    Ganti Foto
+                  </button>
+                  <button
+                    type="button"
+                    onclick="removeOdometerPhoto()"
+                    class="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-xs font-bold text-red-700"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAGIAN 4: TANDA TANGAN DIGITAL PENGEMUDI -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-navy-900 text-amber-400 font-extrabold text-sm flex items-center justify-center">4</span>
+              <div>
+                <h2 class="font-bold text-slate-900 text-base">Tanda Tangan Pengemudi <span class="text-red-500">*</span></h2>
+                <p class="text-xs text-slate-500">Goreskan tanda tangan di kotak bawah agar tercetak di PDF</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onclick="clearDriverSignature()"
+              class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+            >
+              Ulangi TTD
+            </button>
+          </div>
+
+          <div class="relative rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 overflow-hidden">
+            <canvas
+              id="driver-signature-canvas"
+              class="signature-pad w-full h-36 block cursor-crosshair"
+            ></canvas>
+            <span id="signature-placeholder-text" class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-400">
+              ✍️ Tanda tangan di area ini menggunakan jari
+            </span>
+          </div>
+        </div>
+
+        <!-- TOMBOL BUAT PDF & KIRIM WA -->
+        <div class="pt-1">
+          <button
+            type="submit"
+            id="btn-submit-form"
+            class="w-full py-4 px-6 rounded-2xl bg-amber-400 hover:bg-amber-500 active:bg-amber-500 text-navy-950 font-extrabold text-base shadow-lg shadow-amber-500/25 border-2 border-amber-500 flex items-center justify-center gap-2.5 transition transform active:scale-[0.99]"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span id="btn-submit-text">BUAT PDF &amp; SIAPKAN KIRIM WA</span>
+          </button>
+          <p class="text-center text-[11px] text-slate-500 mt-2">
+            Otomatis membuat file PDF resmi siap cetak &amp; dikirim langsung ke WhatsApp.
+          </p>
+        </div>
+      </form>
+    </section>
+
+  </main>
+
+  <script>
+    // Konfigurasi posisi ban per jenis truk (Tronton 10 Roda & Engkel 6 Roda)
+    const TRUCK_CONFIGS = {
+      tronton: {
+        label: 'Tronton (10 Roda)',
+        defaultTyreSize: '10.00-20 (Kawat)',
+        positions: [
+          { code: 'FL', name: 'Depan Kiri' },
+          { code: 'FR', name: 'Depan Kanan' },
+          { code: 'RLO-1', name: 'Blkg Kiri Luar Sumbu 1' },
+          { code: 'RLI-1', name: 'Blkg Kiri Dalam Sumbu 1' },
+          { code: 'RRI-1', name: 'Blkg Kanan Dalam Sumbu 1' },
+          { code: 'RRO-1', name: 'Blkg Kanan Luar Sumbu 1' },
+          { code: 'RLO-2', name: 'Blkg Kiri Luar Sumbu 2' },
+          { code: 'RLI-2', name: 'Blkg Kiri Dalam Sumbu 2' },
+          { code: 'RRI-2', name: 'Blkg Kanan Dalam Sumbu 2' },
+          { code: 'RRO-2', name: 'Blkg Kanan Luar Sumbu 2' },
+          { code: 'SPARE', name: 'Ban Serep' }
+        ]
+      },
+      engkel: {
+        label: 'Engkel (6 Roda)',
+        defaultTyreSize: '7.50-16 (14PR)',
+        positions: [
+          { code: 'FL', name: 'Depan Kiri' },
+          { code: 'FR', name: 'Depan Kanan' },
+          { code: 'RLO', name: 'Belakang Kiri Luar' },
+          { code: 'RLI', name: 'Belakang Kiri Dalam' },
+          { code: 'RRI', name: 'Belakang Kanan Dalam' },
+          { code: 'RRO', name: 'Belakang Kanan Luar' },
+          { code: 'SPARE', name: 'Ban Serep' }
+        ]
+      }
+    };
+
+    const REPLACEMENT_REASONS = [
+      'Aus / Botak Merata (Batas TWI)',
+      'Benjol / Struktur Kawat Putus',
+      'Sobek Samping / Terkena Benda Tajam',
+      'Meledak / Pecah di Jalan',
+      'Keausan Tidak Rata (Makan Sebelah)',
+      'Kirim Vulkanisir (Casing Masih Bagus)'
+    ];
+
+    let currentTruckType = 'tronton';
+    let selectedTyres = {};
+    let odometerPhotoData = '';
+    let hasDriverSigned = false;
+    let lastGeneratedPdfRecord = null;
+    let lastGeneratedPdfBlob = null;
+    let lastGeneratedPdfFilename = '';
+
+    // Menampilkan tanggal hari ini pada header
+    function formatHeaderDate() {
+      const now = new Date();
+      const formatted = now.toLocaleDateString('id-ID', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      const desktopEl = document.getElementById('header-date');
+      const mobileEl = document.getElementById('header-date-mobile');
+      if (desktopEl) desktopEl.textContent = formatted;
+      if (mobileEl) mobileEl.textContent = formatted;
+    }
+
+    // Membentuk identitas form berdasarkan Nama Pengemudi dan Tanggal
+    function generateNextFormNumber(driverNameOverride = '') {
+      const now = new Date();
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const dateStr = `${pad2(now.getDate())}-${pad2(now.getMonth() + 1)}-${now.getFullYear()}`;
+      const driverInput = document.getElementById('input-driver');
+      const rawName = (driverNameOverride || (driverInput ? driverInput.value : '') || '').trim();
+      const displayName = rawName ? rawName.toUpperCase() : 'NAMA SOPIR';
+      return `${displayName} / ${dateStr}`;
+    }
+
+    function updateNextFormNumberPreview() {
+      const el = document.getElementById('preview-form-number');
+      if (el) el.textContent = generateNextFormNumber();
+    }
+
+    // Notifikasi non-blocking pengganti alert()
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bgClass =
+        type === 'error'
+          ? 'bg-red-600 text-white border-red-700'
+          : type === 'info'
+          ? 'bg-navy-900 text-white border-slate-700'
+          : 'bg-emerald-600 text-white border-emerald-700';
+
+      toast.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-xl border text-xs sm:text-sm font-bold flex items-center gap-2.5 animate-slide-up ${bgClass}`;
+      toast.innerHTML = `
+        <span class="text-base">${type === 'error' ? '⚠️' : type === 'info' ? 'ℹ️' : '✅'}</span>
+        <span class="flex-1">${message}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 3200);
+    }
+
+    function openPhotoModal(src, title) {
+      if (!src) return;
+      document.getElementById('photo-modal-img').src = src;
+      document.getElementById('photo-modal-title').textContent = title || 'Preview Foto';
+      const modal = document.getElementById('photo-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePhotoModal() {
+      const modal = document.getElementById('photo-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    let confirmCallback = null;
+    function openConfirmModal(title, desc, onConfirm) {
+      document.getElementById('confirm-modal-title').textContent = title;
+      document.getElementById('confirm-modal-desc').textContent = desc;
+      confirmCallback = onConfirm;
+      const modal = document.getElementById('confirm-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeConfirmModal() {
+      const modal = document.getElementById('confirm-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      confirmCallback = null;
+    }
+
+    document.getElementById('confirm-modal-btn').addEventListener('click', () => {
+      if (typeof confirmCallback === 'function') confirmCallback();
+      closeConfirmModal();
+    });
+
+    // Memilih jenis truk dan merender ulang diagram posisi roda
+    function selectTruckType(type) {
+      currentTruckType = type;
+      selectedTyres = {};
+
+      document.querySelectorAll('.truck-type-btn').forEach((btn) => {
+        const isSelected = btn.getAttribute('data-type') === type;
+        if (isSelected) {
+          btn.className = 'truck-type-btn p-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-left transition flex flex-col justify-between shadow-sm';
+          btn.querySelector('span:first-child').className = 'text-xs font-extrabold text-navy-900';
+        } else {
+          btn.className = 'truck-type-btn p-3 rounded-xl border-2 border-slate-200 bg-white hover:border-slate-300 text-left transition flex flex-col justify-between';
+          btn.querySelector('span:first-child').className = 'text-xs font-extrabold text-slate-800';
+        }
+      });
+
+      renderTruckDiagram();
+      renderSelectedTyresUI();
+    }
+
+    function renderTyreSvgRect(x, y, w, h, code, labelShort) {
+      const isSelected = Boolean(selectedTyres[code]);
+      const fill = isSelected ? '#fbbf24' : '#1e293b';
+      const stroke = isSelected ? '#0f172a' : '#475569';
+      const strokeWidth = isSelected ? '3' : '1.5';
+      const textColor = isSelected ? '#0f172a' : '#f8fafc';
+      const treadColor = isSelected ? '#d97706' : '#334155';
+
+      return `
+        <g class="tyre-btn" onclick="toggleTyreSelection('${code}')">
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />
+          <line x1="${x + w * 0.3}" y1="${y + 4}" x2="${x + w * 0.3}" y2="${y + h - 4}" stroke="${treadColor}" stroke-width="1.5" stroke-dasharray="3 2" />
+          <line x1="${x + w * 0.7}" y1="${y + 4}" x2="${x + w * 0.7}" y2="${y + h - 4}" stroke="${treadColor}" stroke-width="1.5" stroke-dasharray="3 2" />
+          <text x="${x + w / 2}" y="${y + h / 2 + 4}" fill="${textColor}" font-size="${code.length > 5 ? '9' : '10'}" font-weight="800" text-anchor="middle">${labelShort || code}</text>
+        </g>
+      `;
+    }
+
+    function renderTruckDiagram() {
+      const container = document.getElementById('truck-diagram-container');
+      let svgContent = '';
+
+      if (currentTruckType === 'tronton') {
+        svgContent = `
+          <svg viewBox="0 0 340 420" class="w-full h-auto select-none">
+            <text x="170" y="18" fill="#0f172a" font-size="11" font-weight="800" text-anchor="middle">▲ DEPAN TRUK (KABIN)</text>
+            <text x="42" y="34" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">KIRI (L)</text>
+            <text x="298" y="34" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">KANAN (R)</text>
+
+            <rect x="148" y="65" width="8" height="305" rx="2" fill="#94a3b8" />
+            <rect x="184" y="65" width="8" height="305" rx="2" fill="#94a3b8" />
+
+            <rect x="108" y="42" width="124" height="72" rx="14" fill="#dbeafe" stroke="#3b82f6" stroke-width="2" />
+            <path d="M 118 52 Q 170 44 222 52 L 216 70 Q 170 64 124 70 Z" fill="#93c5fd" />
+            <text x="170" y="96" fill="#1e3a8a" font-size="11" font-weight="800" text-anchor="middle">KABIN TRONTON</text>
+
+            <line x1="76" y1="82" x2="264" y2="82" stroke="#1e293b" stroke-width="5" />
+            ${renderTyreSvgRect(44, 54, 34, 56, 'FL', 'FL')}
+            ${renderTyreSvgRect(262, 54, 34, 56, 'FR', 'FR')}
+
+            <rect x="104" y="124" width="132" height="262" rx="10" fill="#e2e8f0" fill-opacity="0.55" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" />
+            <text x="170" y="144" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">BAK / TANGKI / KARGO</text>
+
+            <text x="170" y="168" fill="#475569" font-size="9" font-weight="700" text-anchor="middle">BAN SEREP</text>
+            ${renderTyreSvgRect(142, 174, 56, 32, 'SPARE', 'SPARE')}
+
+            <text x="170" y="232" fill="#334155" font-size="9" font-weight="800" text-anchor="middle">SUMBU BELAKANG 1</text>
+            <line x1="36" y1="264" x2="304" y2="264" stroke="#1e293b" stroke-width="6" />
+            ${renderTyreSvgRect(16, 238, 36, 54, 'RLO-1', 'RLO-1')}
+            ${renderTyreSvgRect(56, 238, 36, 54, 'RLI-1', 'RLI-1')}
+            ${renderTyreSvgRect(248, 238, 36, 54, 'RRI-1', 'RRI-1')}
+            ${renderTyreSvgRect(288, 238, 36, 54, 'RRO-1', 'RRO-1')}
+
+            <text x="170" y="314" fill="#334155" font-size="9" font-weight="800" text-anchor="middle">SUMBU BELAKANG 2</text>
+            <line x1="36" y1="346" x2="304" y2="346" stroke="#1e293b" stroke-width="6" />
+            ${renderTyreSvgRect(16, 320, 36, 54, 'RLO-2', 'RLO-2')}
+            ${renderTyreSvgRect(56, 320, 36, 54, 'RLI-2', 'RLI-2')}
+            ${renderTyreSvgRect(248, 320, 36, 54, 'RRI-2', 'RRI-2')}
+            ${renderTyreSvgRect(288, 320, 36, 54, 'RRO-2', 'RRO-2')}
+
+            <text x="170" y="406" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">▼ BELAKANG TRUK</text>
+          </svg>
+        `;
+      } else {
+        svgContent = `
+          <svg viewBox="0 0 340 340" class="w-full h-auto select-none">
+            <text x="170" y="18" fill="#0f172a" font-size="11" font-weight="800" text-anchor="middle">▲ DEPAN ENGKEL (6 RODA)</text>
+            <text x="42" y="34" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">KIRI (L)</text>
+            <text x="298" y="34" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">KANAN (R)</text>
+
+            <rect x="150" y="65" width="8" height="225" rx="2" fill="#94a3b8" />
+            <rect x="182" y="65" width="8" height="225" rx="2" fill="#94a3b8" />
+
+            <rect x="114" y="42" width="112" height="68" rx="14" fill="#dbeafe" stroke="#3b82f6" stroke-width="2" />
+            <text x="170" y="84" fill="#1e3a8a" font-size="11" font-weight="800" text-anchor="middle">KABIN ENGKEL</text>
+
+            <line x1="76" y1="80" x2="264" y2="80" stroke="#1e293b" stroke-width="5" />
+            ${renderTyreSvgRect(44, 52, 36, 56, 'FL', 'FL')}
+            ${renderTyreSvgRect(260, 52, 36, 56, 'FR', 'FR')}
+
+            <rect x="108" y="122" width="124" height="185" rx="10" fill="#e2e8f0" fill-opacity="0.55" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" />
+            <text x="170" y="156" fill="#475569" font-size="9" font-weight="700" text-anchor="middle">BAN SEREP</text>
+            ${renderTyreSvgRect(142, 164, 56, 32, 'SPARE', 'SPARE')}
+
+            <text x="170" y="226" fill="#334155" font-size="9" font-weight="800" text-anchor="middle">SUMBU BELAKANG (RODA GANDA)</text>
+            <line x1="36" y1="258" x2="304" y2="258" stroke="#1e293b" stroke-width="6" />
+            ${renderTyreSvgRect(16, 232, 36, 56, 'RLO', 'RLO')}
+            ${renderTyreSvgRect(56, 232, 36, 56, 'RLI', 'RLI')}
+            ${renderTyreSvgRect(248, 232, 36, 56, 'RRI', 'RRI')}
+            ${renderTyreSvgRect(288, 232, 36, 56, 'RRO', 'RRO')}
+
+            <text x="170" y="326" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">▼ BELAKANG TRUK</text>
+          </svg>
+        `;
+      }
+
+      container.innerHTML = svgContent;
+    }
+
+    function toggleTyreSelection(code) {
+      const config = TRUCK_CONFIGS[currentTruckType];
+      const posObj = config.positions.find((p) => p.code === code);
+      if (!posObj) return;
+
+      if (selectedTyres[code]) {
+        delete selectedTyres[code];
+      } else {
+        selectedTyres[code] = {
+          code: posObj.code,
+          name: posObj.name,
+          size: config.defaultTyreSize,
+          serialOld: '',
+          kmInstalled: '',
+          reason: REPLACEMENT_REASONS[0],
+          photoData: ''
+        };
+      }
+
+      renderTruckDiagram();
+      renderSelectedTyresUI();
+    }
+
+    function updateTyreField(code, field, value) {
+      if (!selectedTyres[code]) return;
+      selectedTyres[code][field] = value;
+      if (field === 'kmInstalled') {
+        updateSingleTyreKmDisplay(code);
+      }
+    }
+
+    function updateSingleTyreKmDisplay(code) {
+      const item = selectedTyres[code];
+      if (!item) return;
+      const currentOdo = parseFloat(document.getElementById('input-odometer').value) || 0;
+      const installedKm = parseFloat(item.kmInstalled) || 0;
+      const badgeEl = document.getElementById(`km-used-display-${code}`);
+      if (!badgeEl) return;
+
+      if (currentOdo > 0 && installedKm > 0 && currentOdo >= installedKm) {
+        const diff = currentOdo - installedKm;
+        badgeEl.textContent = `${diff.toLocaleString('id-ID')} KM`;
+        badgeEl.className = 'text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg';
+      } else if (currentOdo > 0 && installedKm > currentOdo) {
+        badgeEl.textContent = 'KM Pasang > Odometer!';
+        badgeEl.className = 'text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-lg';
+      } else {
+        badgeEl.textContent = 'Otomatis terhitung';
+        badgeEl.className = 'text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg';
+      }
+    }
+
+    function recalculateAllKm() {
+      Object.keys(selectedTyres).forEach((code) => updateSingleTyreKmDisplay(code));
+    }
+
+    async function handleTyrePhotoChange(event, code) {
+      const file = event.target.files && event.target.files[0];
+      if (!file || !selectedTyres[code]) return;
+      try {
+        selectedTyres[code].photoData = await compressImageFile(file, 760, 0.72);
+        renderSelectedTyresUI();
+        showToast(`Foto ban ${code} berhasil dilampirkan`, 'success');
+      } catch (err) {
+        showToast('Gagal memproses foto ban.', 'error');
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function removeTyrePhoto(code) {
+      if (!selectedTyres[code]) return;
+      selectedTyres[code].photoData = '';
+      renderSelectedTyresUI();
+    }
+
+    function renderSelectedTyresUI() {
+      const keys = Object.keys(selectedTyres);
+      const countPill = document.getElementById('selected-count-pill');
+      const pillsWrap = document.getElementById('selected-tyres-pills');
+      const detailsWrap = document.getElementById('selected-tyres-details-wrapper');
+
+      countPill.textContent = `${keys.length} Ban Dipilih`;
+
+      if (keys.length === 0) {
+        pillsWrap.innerHTML = `<span class="text-xs text-slate-400 italic">Belum ada posisi ban yang dipilih. Silakan tap gambar ban di atas.</span>`;
+        detailsWrap.innerHTML = '';
+        return;
+      }
+
+      pillsWrap.innerHTML = keys
+        .map(
+          (code) => `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-navy-900 text-amber-400 text-xs font-extrabold shadow-sm">
+            <span>${code}</span>
+            <button type="button" onclick="toggleTyreSelection('${code}')" class="text-slate-300 hover:text-white ml-0.5">✕</button>
+          </span>
+        `
+        )
+        .join('');
+
+      const currentOdo = parseFloat(document.getElementById('input-odometer').value) || 0;
+
+      detailsWrap.innerHTML = keys
+        .map((code, idx) => {
+          const item = selectedTyres[code];
+          const installedKm = parseFloat(item.kmInstalled) || 0;
+          let kmText = 'Otomatis terhitung';
+          let kmClass = 'text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg';
+          if (currentOdo > 0 && installedKm > 0 && currentOdo >= installedKm) {
+            kmText = `${(currentOdo - installedKm).toLocaleString('id-ID')} KM`;
+            kmClass = 'text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg';
+          }
+
+          const reasonOptions = REPLACEMENT_REASONS.map(
+            (r) => `<option value="${r}" ${item.reason === r ? 'selected' : ''}>${r}</option>`
+          ).join('');
+
+          return `
+            <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-amber-400 space-y-3.5 animate-slide-up">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2.5">
+                  <span class="px-3 py-1 rounded-xl bg-amber-400 text-navy-950 font-extrabold text-sm shadow-sm">${item.code}</span>
+                  <div>
+                    <h3 class="font-bold text-slate-900 text-sm">${item.name}</h3>
+                    <span class="text-[11px] text-slate-500">Detail Ban #${idx + 1}</span>
+                  </div>
+                </div>
+                <button type="button" onclick="toggleTyreSelection('${item.code}')" class="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold">
+                  Hapus
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Ukuran &amp; Tipe Ban</label>
+                  <input
+                    type="text"
+                    value="${item.size}"
+                    oninput="updateTyreField('${item.code}', 'size', this.value)"
+                    placeholder="Contoh: 10.00-20 (Kawat)"
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:border-navy-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">No. Seri Ban Lama (Serial Number)</label>
+                  <input
+                    type="text"
+                    value="${item.serialOld}"
+                    oninput="updateTyreField('${item.code}', 'serialOld', this.value.toUpperCase())"
+                    placeholder="Contoh: BS-2409112"
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold uppercase focus:border-navy-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">KM Saat Pasang Ban Lama</label>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    value="${item.kmInstalled}"
+                    oninput="updateTyreField('${item.code}', 'kmInstalled', this.value)"
+                    placeholder="Contoh: 140000"
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold focus:border-navy-900 focus:outline-none"
+                  />
+                </div>
+
+                <div class="flex items-center justify-between bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200">
+                  <span class="text-xs font-semibold text-slate-600">KM Terpakai:</span>
+                  <span id="km-used-display-${item.code}" class="${kmClass}">${kmText}</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Alasan Penggantian</label>
+                <select
+                  onchange="updateTyreField('${item.code}', 'reason', this.value)"
+                  class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white focus:border-navy-900 focus:outline-none"
+                >
+                  ${reasonOptions}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Foto Kondisi Ban Lama (${item.code}) <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="file"
+                  id="tyre-photo-input-${item.code}"
+                  accept="image/*"
+                  class="hidden"
+                  onchange="handleTyrePhotoChange(event, '${item.code}')"
+                />
+
+                ${
+                  item.photoData
+                    ? `
+                    <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <img
+                        src="${item.photoData}"
+                        alt="Foto Ban ${item.code}"
+                        onclick="openPhotoModal(this.src, 'Kondisi Ban ${item.code} (${item.name})')"
+                        class="w-20 h-20 rounded-xl object-cover border border-slate-300 cursor-pointer shrink-0"
+                      />
+                      <div class="flex-1 space-y-2">
+                        <span class="text-xs font-bold text-emerald-700 block">✓ Foto kondisi ban terlampir</span>
+                        <div class="flex gap-2">
+                          <button type="button" onclick="document.getElementById('tyre-photo-input-${item.code}').click()" class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-xs font-bold text-slate-800">
+                            Ganti
+                          </button>
+                          <button type="button" onclick="removeTyrePhoto('${item.code}')" class="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-xs font-bold text-red-700">
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  `
+                    : `
+                    <button
+                      type="button"
+                      onclick="document.getElementById('tyre-photo-input-${item.code}').click()"
+                      class="w-full py-3 px-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-navy-900 bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 transition"
+                    >
+                      <span>📷 Jepret / Upload Foto Ban ${item.code}</span>
+                    </button>
+                  `
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    async function handleOdometerPhotoChange(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        odometerPhotoData = await compressImageFile(file, 800, 0.72);
+        document.getElementById('odometer-photo-preview').src = odometerPhotoData;
+        document.getElementById('odometer-photo-placeholder').classList.add('hidden');
+        document.getElementById('odometer-photo-preview-wrap').classList.remove('hidden');
+        showToast('Foto odometer berhasil dilampirkan', 'success');
+      } catch (err) {
+        showToast('Gagal memproses foto odometer.', 'error');
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function removeOdometerPhoto() {
+      odometerPhotoData = '';
+      document.getElementById('input-odometer-photo').value = '';
+      document.getElementById('odometer-photo-placeholder').classList.remove('hidden');
+      document.getElementById('odometer-photo-preview-wrap').classList.add('hidden');
+    }
+
+    function resetDriverForm() {
+      document.getElementById('tyre-request-form').reset();
+      selectedTyres = {};
+      removeOdometerPhoto();
+      clearDriverSignature();
+      updateNextFormNumberPreview();
+      selectTruckType('tronton');
+      showToast('Formulir telah dibersihkan', 'info');
+    }
+
+    // Canvas tanda tangan digital pengemudi
+    function initSignaturePad() {
+      const canvas = document.getElementById('driver-signature-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let isDrawing = false;
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = rect.width * ratio;
+        canvas.height = rect.height * ratio;
+        ctx.scale(ratio, ratio);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 2.6;
+        ctx.strokeStyle = '#0f172a';
+      }
+
+      resizeCanvas();
+      window.addEventListener('resize', () => {
+        if (!hasDriverSigned) resizeCanvas();
+      });
+
+      function getCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        if (e.touches && e.touches.length > 0) {
+          return {
+            x: e.touches[0].clientX - rect.left,
+            y: e.touches[0].clientY - rect.top
+          };
+        }
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+      }
+
+      function startDraw(e) {
+        isDrawing = true;
+        hasDriverSigned = true;
+        const placeholder = document.getElementById('signature-placeholder-text');
+        if (placeholder) placeholder.classList.add('hidden');
+        const pos = getCoords(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      }
+
+      function moveDraw(e) {
+        if (!isDrawing) return;
+        if (e.cancelable) e.preventDefault();
+        const pos = getCoords(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+
+      function endDraw() {
+        isDrawing = false;
+      }
+
+      canvas.addEventListener('mousedown', startDraw);
+      canvas.addEventListener('mousemove', moveDraw);
+      window.addEventListener('mouseup', endDraw);
+
+      canvas.addEventListener('touchstart', startDraw, { passive: false });
+      canvas.addEventListener('touchmove', moveDraw, { passive: false });
+      canvas.addEventListener('touchend', endDraw);
+    }
+
+    function clearDriverSignature() {
+      const canvas = document.getElementById('driver-signature-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      hasDriverSigned = false;
+      const placeholder = document.getElementById('signature-placeholder-text');
+      if (placeholder) placeholder.classList.remove('hidden');
+    }
+
+    function getDriverSignatureDataUrl() {
+      const canvas = document.getElementById('driver-signature-canvas');
+      if (!canvas || !hasDriverSigned) return '';
+      return canvas.toDataURL('image/png');
+    }
+
+    // Kompresi foto agar ringan di HP dan siap disematkan ke PDF
+    function compressImageFile(file, maxWidth = 800, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        if (!file) {
+          reject(new Error('File tidak ditemukan'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              let width = img.width || maxWidth;
+              let height = img.height || Math.round(maxWidth * 0.75);
+
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (err) {
+              reject(err);
+            }
+          };
+          img.onerror = () => reject(new Error('Gagal memuat gambar'));
+          img.src = readerEvent.target.result;
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function normalizeImageForPdf(dataUrl) {
+      return new Promise((resolve) => {
+        if (!dataUrl) {
+          resolve(null);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width || 400;
+            canvas.height = img.height || 300;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } catch (e) {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      });
+    }
+
+    // Pembuatan file PDF resmi format A4 menggunakan jsPDF
+    async function buildRequestPdf(record, autoDownload = true) {
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        showToast('Library PDF sedang dimuat, coba sesaat lagi.', 'error');
+        return null;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = 210;
+      const margin = 14;
+      const contentW = pageW - margin * 2;
+      let y = 14;
+
+      doc.setFillColor(15, 23, 42);
+      doc.roundedRect(margin, y, contentW, 20, 2.5, 2.5, 'F');
+
+      doc.setTextColor(251, 191, 36);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('FORMULIR PERMINTAAN PENGGANTIAN BAN ARMADA', margin + 5, y + 8.5);
+
+      doc.setTextColor(226, 232, 240);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text('DIVISI OPERASIONAL & MAINTENANCE ARMADA TRUK', margin + 5, y + 14.5);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(record.formNumber, pageW - margin - 5, y + 8.5, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Tgl: ${record.createdAt}`, pageW - margin - 5, y + 14.5, { align: 'right' });
+
+      y += 25;
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(margin, y, contentW, 20, 2, 2, 'FD');
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+
+      const col1X = margin + 4;
+      const col2X = margin + 96;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('No. Polisi (Plat):', col1X, y + 6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(record.nopol, col1X + 32, y + 6.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Jenis Armada:', col1X, y + 13.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(record.truckTypeLabel, col1X + 32, y + 13.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Nama Pengemudi:', col2X, y + 6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(record.driverName, col2X + 33, y + 6.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Odometer Saat Ini:', col2X, y + 13.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(180, 83, 9);
+      doc.text(`${Number(record.odometerCurrent).toLocaleString('id-ID')} KM`, col2X + 33, y + 13.5);
+
+      doc.setTextColor(15, 23, 42);
+      y += 25;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text('A. DETAIL PERMINTAAN & RIWAYAT BAN LAMA', margin, y);
+      y += 3;
+
+      const cols = [
+        { label: 'No', w: 8 },
+        { label: 'Posisi Ban', w: 34 },
+        { label: 'Ukuran & Tipe', w: 28 },
+        { label: 'No. Seri Lama', w: 25 },
+        { label: 'KM Pasang', w: 20 },
+        { label: 'KM Pakai', w: 20 },
+        { label: 'Alasan Penggantian', w: 39 },
+        { label: 'Qty', w: 8 }
+      ];
+
+      doc.setFillColor(30, 41, 59);
+      doc.rect(margin, y, contentW, 7.5, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+
+      let curX = margin;
+      cols.forEach((c) => {
+        doc.text(c.label, curX + 1.5, y + 5);
+        curX += c.w;
+      });
+      y += 7.5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      record.tyres.forEach((t, idx) => {
+        const rowH = 9.5;
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(margin, y, contentW, rowH, 'F');
+        }
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(margin, y, contentW, rowH, 'S');
+
+        const vals = [
+          String(idx + 1),
+          `${t.code} - ${t.name}`.slice(0, 22),
+          (t.size || '-').slice(0, 18),
+          (t.serialOld || '-').slice(0, 15),
+          t.kmInstalled ? Number(t.kmInstalled).toLocaleString('id-ID') : '-',
+          t.kmUsed > 0 ? Number(t.kmUsed).toLocaleString('id-ID') : '-',
+          (t.reason || '-').slice(0, 26),
+          '1'
+        ];
+
+        let cellX = margin;
+        vals.forEach((v, cIdx) => {
+          doc.setFont('helvetica', cIdx === 1 ? 'bold' : 'normal');
+          doc.text(v, cellX + 1.5, y + 6);
+          cellX += cols[cIdx].w;
+        });
+        y += rowH;
+      });
+
+      doc.setFillColor(254, 243, 199);
+      doc.rect(margin, y, contentW, 7.5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(`Total Ban Diminta: ${record.tyres.length} Unit`, margin + 3, y + 5);
+      y += 12;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text('B. LAMPIRAN BUKTI FOTO ODOMETER & KONDISI BAN LAMA', margin, y);
+      y += 3.5;
+
+      const photoItems = [];
+      if (record.odometerPhoto) {
+        photoItems.push({
+          label: `ODOMETER: ${Number(record.odometerCurrent).toLocaleString('id-ID')} KM`,
+          src: record.odometerPhoto
+        });
+      }
+      record.tyres.forEach((t) => {
+        if (t.photoData) {
+          photoItems.push({
+            label: `BAN ${t.code} (${t.serialOld || 'Tanpa Seri'})`,
+            src: t.photoData
+          });
+        }
+      });
+
+      const maxPhotosToRender = photoItems.slice(0, 4);
+      const cardW = (contentW - 9) / 4;
+      const cardH = 38;
+
+      for (let i = 0; i < maxPhotosToRender.length; i++) {
+        const pItem = maxPhotosToRender[i];
+        const px = margin + i * (cardW + 3);
+        doc.setDrawColor(203, 213, 225);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(px, y, cardW, cardH, 1.5, 1.5, 'FD');
+
+        const normalizedImg = await normalizeImageForPdf(pItem.src);
+        if (normalizedImg) {
+          doc.addImage(normalizedImg, 'JPEG', px + 1.5, y + 1.5, cardW - 3, cardH - 8);
+        }
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text(pItem.label.slice(0, 22), px + cardW / 2, y + cardH - 2, { align: 'center' });
+      }
+
+      y += cardH + 7;
+
+      if (y > 235) {
+        doc.addPage();
+        y = 18;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('C. KOLOM PENGAJUAN & PERSETUJUAN', margin, y);
+      y += 3.5;
+
+      const sigCols = [
+        { title: 'Diajukan Oleh,', role: 'Pengemudi / Sopir', name: record.driverName, hasSig: true },
+        { title: 'Diperiksa Oleh,', role: 'Kepala Mekanik', name: '(_______________)', hasSig: false },
+        { title: 'Disetujui Oleh,', role: 'Manager Operasional', name: '(_______________)', hasSig: false },
+        { title: 'Diserahkan Oleh,', role: 'Logistik / Gudang', name: '(_______________)', hasSig: false }
+      ];
+
+      const sigW = (contentW - 6) / 4;
+      const sigH = 34;
+      const normalizedSig = record.driverSignature ? await normalizeImageForPdf(record.driverSignature) : null;
+
+      sigCols.forEach((sc, idx) => {
+        const sx = margin + idx * (sigW + 2);
+        doc.setDrawColor(148, 163, 184);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(sx, y, sigW, sigH, 'FD');
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(sc.title, sx + sigW / 2, y + 4.5, { align: 'center' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(sc.role, sx + sigW / 2, y + 8.5, { align: 'center' });
+
+        if (sc.hasSig && normalizedSig) {
+          doc.addImage(normalizedSig, 'JPEG', sx + 4, y + 10, sigW - 8, 15);
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.text(sc.name.slice(0, 20), sx + sigW / 2, y + sigH - 3, { align: 'center' });
+      });
+
+      y += sigH + 5;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        'Catatan: Ban bekas wajib diserahkan ke bagian gudang/logistik sebagai syarat serah terima ban baru.',
+        margin,
+        y
+      );
+
+      const safeDriver = record.driverName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+      const dateCompact = record.createdAt.slice(0, 10).split('-').reverse().join('-');
+      const filename = `Form_Ban_${safeDriver}_${dateCompact}.pdf`;
+
+      const pdfBlob = doc.output('blob');
+      lastGeneratedPdfRecord = record;
+      lastGeneratedPdfBlob = pdfBlob;
+      lastGeneratedPdfFilename = filename;
+
+      if (autoDownload) {
+        doc.save(filename);
+      }
+
+      return { blob: pdfBlob, filename };
+    }
+
+    function openPdfShareModal(record, filename) {
+      document.getElementById('pdf-modal-form-no').textContent = record.formNumber;
+      document.getElementById('pdf-modal-nopol').textContent = record.nopol;
+      document.getElementById('pdf-modal-driver').textContent = record.driverName;
+      document.getElementById('pdf-modal-tyres').textContent = record.tyres.map((t) => t.code).join(', ');
+      document.getElementById('pdf-modal-filename').textContent = filename;
+
+      const modal = document.getElementById('pdf-share-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePdfShareModal() {
+      const modal = document.getElementById('pdf-share-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function redownloadCurrentPdf() {
+      if (!lastGeneratedPdfRecord) return;
+      buildRequestPdf(lastGeneratedPdfRecord, true);
+      showToast(`Mengunduh ulang ${lastGeneratedPdfFilename}`, 'info');
+    }
+
+    // Mengirimkan file PDF melalui Web Share API di HP atau membuka WhatsApp dengan ringkasan
+    async function shareCurrentPdfToWhatsApp() {
+      if (!lastGeneratedPdfRecord || !lastGeneratedPdfBlob) return;
+      const rec = lastGeneratedPdfRecord;
+      const tyreSummary = rec.tyres
+        .map((t) => `• ${t.code} (${t.name}) - ${t.reason}`)
+        .join('\n');
+
+      const waText =
+        `*PERMINTAAN PENGGANTIAN BAN ARMADA*\n` +
+        `Identitas Form: *${rec.formNumber}*\n` +
+        `No. Polisi: *${rec.nopol}*\n` +
+        `Jenis Truk: ${rec.truckTypeLabel}\n` +
+        `Pengemudi: ${rec.driverName}\n` +
+        `Odometer: *${Number(rec.odometerCurrent).toLocaleString('id-ID')} KM*\n\n` +
+        `*Detail Ban Diminta (${rec.tyres.length} Unit):*\n${tyreSummary}\n\n` +
+        `_(Terlampir file PDF Form Permintaan Ban resmi)_`;
+
+      try {
+        const pdfFile = new File([lastGeneratedPdfBlob], lastGeneratedPdfFilename, {
+          type: 'application/pdf'
+        });
+
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            title: `Form Permintaan Ban - ${rec.nopol}`,
+            text: waText,
+            files: [pdfFile]
+          });
+          showToast('Berhasil membuka menu kirim file ke WhatsApp!', 'success');
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+      window.open(waUrl, '_blank');
+      showToast(`WhatsApp dibuka! Silakan lampirkan file "${lastGeneratedPdfFilename}" dari folder Download.`, 'info');
+    }
+
+    // Validasi input & proses pembuatan PDF saat formulir dikirim
+    async function handleFormSubmit(event) {
+      event.preventDefault();
+
+      const nopol = document.getElementById('input-nopol').value.trim().toUpperCase();
+      const driverName = document.getElementById('input-driver').value.trim();
+      const odometerCurrent = parseFloat(document.getElementById('input-odometer').value) || 0;
+      const tyreKeys = Object.keys(selectedTyres);
+
+      if (!nopol) {
+        showToast('Nomor Polisi (Plat) truk wajib diisi!', 'error');
+        document.getElementById('input-nopol').focus();
+        return;
+      }
+      if (!driverName) {
+        showToast('Nama Pengemudi wajib diisi!', 'error');
+        document.getElementById('input-driver').focus();
+        return;
+      }
+      if (odometerCurrent <= 0) {
+        showToast('Angka Odometer / KM saat ini wajib diisi!', 'error');
+        document.getElementById('input-odometer').focus();
+        return;
+      }
+      if (tyreKeys.length === 0) {
+        showToast('Pilih minimal 1 posisi ban pada diagram truk!', 'error');
+        return;
+      }
+
+      for (const code of tyreKeys) {
+        if (!selectedTyres[code].photoData) {
+          showToast(`Mohon lampirkan foto kondisi ban posisi ${code}!`, 'error');
+          return;
+        }
+      }
+      if (!odometerPhotoData) {
+        showToast('Mohon lampirkan foto Odometer Dashboard truk!', 'error');
+        return;
+      }
+
+      const driverSignatureData = getDriverSignatureDataUrl();
+      if (!driverSignatureData) {
+        showToast('Mohon bubuhkan tanda tangan pengemudi terlebih dahulu!', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btn-submit-form');
+      const submitText = document.getElementById('btn-submit-text');
+      submitBtn.disabled = true;
+      submitText.textContent = 'MEMBUAT PDF FORMULIR...';
+
+      const now = new Date();
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const formattedTimestamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
+      const tyresPayload = tyreKeys.map((code) => {
+        const t = selectedTyres[code];
+        const kmInst = parseFloat(t.kmInstalled) || 0;
+        const kmUsed = kmInst > 0 && odometerCurrent >= kmInst ? odometerCurrent - kmInst : 0;
+        return {
+          code: t.code,
+          name: t.name,
+          size: t.size || TRUCK_CONFIGS[currentTruckType].defaultTyreSize,
+          serialOld: t.serialOld || '-',
+          kmInstalled: kmInst,
+          kmUsed: kmUsed,
+          reason: t.reason,
+          photoData: t.photoData
+        };
+      });
+
+      const newRequest = {
+        id: 'req-' + Date.now(),
+        formNumber: generateNextFormNumber(driverName),
+        createdAt: formattedTimestamp,
+        nopol,
+        truckType: currentTruckType,
+        truckTypeLabel: TRUCK_CONFIGS[currentTruckType].label,
+        driverName,
+        odometerCurrent,
+        odometerPhoto: odometerPhotoData,
+        driverSignature: driverSignatureData,
+        tyres: tyresPayload
+      };
+
+      const pdfResult = await buildRequestPdf(newRequest, true);
+
+      submitBtn.disabled = false;
+      submitText.textContent = 'BUAT PDF & SIAPKAN KIRIM WA';
+
+      document.getElementById('tyre-request-form').reset();
+      selectedTyres = {};
+      removeOdometerPhoto();
+      clearDriverSignature();
+      updateNextFormNumberPreview();
+      selectTruckType('tronton');
+
+      showToast(`${newRequest.formNumber} berhasil dibuat & diunduh sebagai PDF!`, 'success');
+      if (pdfResult) {
+        openPdfShareModal(newRequest, pdfResult.filename);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      formatHeaderDate();
+      updateNextFormNumberPreview();
+      initSignaturePad();
+      selectTruckType('tronton');
+    });
+  </script>
+</body>
+</html>
